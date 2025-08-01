@@ -4,6 +4,14 @@ import { UserService } from '../user/user.service';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { User } from '../user/entities/user.entity';
+
+interface JwtPayload {
+  sub: string;
+  email: string;
+  iat?: number; // issued at timestamp
+  exp?: number; // expiration timestamp
+}
 
 @Injectable()
 export class AuthService {
@@ -31,20 +39,25 @@ export class AuthService {
       createUserDto.email,
       createUserDto.password,
     );
-    return this.generateToken(user);
+    if (user) return this.generateToken(user);
+    else throw new UnauthorizedException('Invalid credentials');
   }
 
-  async generateToken(user: any) {
-    const payload = {
+  generateToken(user: User): string {
+    const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
     };
-    return this.jwtService.sign(payload);
+    return this.jwtService.sign(payload, {
+      secret: this.config.get<string>('JWT_SECRET'),
+    });
   }
 
-  verifyToken(token: string) {
+  verifyToken(token: string): JwtPayload {
     try {
-      return this.jwtService.verify(token);
+      return this.jwtService.verify(token, {
+        secret: this.config.get<string>('JWT_SECRET'),
+      });
     } catch (e) {
       throw new UnauthorizedException('Invalid or expired token');
     }

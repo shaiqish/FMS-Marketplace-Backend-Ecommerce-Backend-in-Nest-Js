@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Req } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Cart } from './entities/cart.entity';
 import { CartItem } from './entities/cart-item.entity';
 import { Product } from '../product/entities/product.entity';
 import { AddItemDTO } from './dto/add-item.dto';
 import { ChangeQuantityDTO } from './dto/change-quantity.dto';
+import RequestWithUser from 'src/common/interfaces/RequestWithUser.interface';
 
 @Injectable()
 export class CartService {
@@ -28,14 +29,14 @@ export class CartService {
     return cart;
   }
 
-  async addItemToCart(addItemDTO: AddItemDTO): Promise<Cart> {
+  async addItemToCart(addItemDTO: AddItemDTO, id: string): Promise<Cart> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
       const cart = await queryRunner.manager.findOne(Cart, {
-        where: { user: { id: addItemDTO.userId } },
+        where: { user: { id } },
         relations: ['items', 'items.product'],
       });
       if (!cart) {
@@ -93,7 +94,7 @@ export class CartService {
     await queryRunner.startTransaction();
 
     try {
-      const cart = await queryRunner.manager.findOne(Cart, {
+      let cart = await queryRunner.manager.findOne(Cart, {
         where: { user: { id: userId } },
         relations: ['items', 'items.product'],
       });
@@ -117,11 +118,16 @@ export class CartService {
         cart.totalAmount - cartItem.priceAtTime * cartItem.quantity,
       );
 
-      await queryRunner.manager.remove(CartItem, cartItem);
       await queryRunner.manager.save(Cart, cart);
+      await queryRunner.manager.remove(CartItem, cartItem);
+      cart = await queryRunner.manager.findOne(Cart, {
+        where: { user: { id: userId } },
+        relations: ['items', 'items.product'],
+      });
 
       await queryRunner.commitTransaction();
-      return cart;
+      if (cart) return cart;
+      else throw new NotFoundException(`Cart not found after removal`);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
@@ -131,7 +137,8 @@ export class CartService {
   }
 
   async decrementCartItemQuantity(
-    changeQuantityDTO: ChangeQuantityDTO,
+    userId: string,
+    productId: string,
   ): Promise<Cart> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -139,22 +146,18 @@ export class CartService {
 
     try {
       const cart = await queryRunner.manager.findOne(Cart, {
-        where: { user: { id: changeQuantityDTO.userId } },
+        where: { user: { id: userId } },
         relations: ['items', 'items.product'],
       });
-      if (!cart) {
-        throw new NotFoundException(`Cart not found`);
-      }
+      if (!cart) throw new NotFoundException(`Cart not found`);
 
-      const cartItem = (cart.items ?? []).find(
-        (item) => item.product.id === changeQuantityDTO.productId,
+      const cartItem = cart.items?.find(
+        (item) => item.product.id === productId,
       );
-
-      if (!cartItem) {
+      if (!cartItem)
         throw new NotFoundException(
-          `Cart item with product ${changeQuantityDTO.productId} not found`,
+          `Cart item with product ${productId} not found`,
         );
-      }
 
       if (cartItem.quantity > 1) {
         cartItem.quantity -= 1;
@@ -178,7 +181,8 @@ export class CartService {
   }
 
   async incrementCartItemQuantity(
-    changeQuantityDTO: ChangeQuantityDTO,
+    userId: string,
+    productId: string,
   ): Promise<Cart> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -186,22 +190,18 @@ export class CartService {
 
     try {
       const cart = await queryRunner.manager.findOne(Cart, {
-        where: { user: { id: changeQuantityDTO.userId } },
+        where: { user: { id: userId } },
         relations: ['items', 'items.product'],
       });
-      if (!cart) {
-        throw new NotFoundException(`Cart not found`);
-      }
+      if (!cart) throw new NotFoundException(`Cart not found`);
 
       const cartItem = cart.items?.find(
-        (item) => item.product.id === changeQuantityDTO.productId,
+        (item) => item.product.id === productId,
       );
-
-      if (!cartItem) {
+      if (!cartItem)
         throw new NotFoundException(
-          `Cart item with product ${changeQuantityDTO.productId} not found`,
+          `Cart item with product ${productId} not found`,
         );
-      }
 
       cartItem.quantity += 1;
       await queryRunner.manager.save(CartItem, cartItem);

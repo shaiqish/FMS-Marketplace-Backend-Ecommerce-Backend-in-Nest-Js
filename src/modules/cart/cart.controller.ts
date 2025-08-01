@@ -1,9 +1,22 @@
-import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { CartService } from './cart.service';
 import { AddItemDTO } from './dto/add-item.dto';
 import { ChangeQuantityDTO } from './dto/change-quantity.dto';
+import { AuthGuard } from 'src/common/guards/auth.guard';
+
+import RequestWithUser from 'src/common/interfaces/RequestWithUser.interface';
 
 @Controller('cart')
+@UseGuards(AuthGuard)
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
@@ -12,35 +25,42 @@ export class CartController {
     return this.cartService.findAll();
   }
 
-  @Get(':id')
-  getCart(@Param('id') id: string) {
-    return this.cartService.findOne(id);
+  @Get('user-cart')
+  async getCart(@Req() req: RequestWithUser) {
+    return this.cartService.findOne(req.user.id);
   }
 
   @Post('add-item')
-  addItemToCart(@Body() addItemDTO: AddItemDTO) {
-    return this.cartService.addItemToCart(addItemDTO);
+  addItemToCart(@Body() addItemDTO: AddItemDTO, @Req() req: RequestWithUser) {
+    return this.cartService.addItemToCart(addItemDTO, req.user.id);
   }
+
   @Post('remove-item')
-  removeItemToCart(
-    @Body('userId') userId: string,
+  removeItemFromCart(
     @Body('productId') productId: string,
+    @Req() req: RequestWithUser,
   ) {
-    return this.cartService.removeCartItem(userId, productId);
+    return this.cartService.removeCartItem(req.user.id, productId);
   }
 
   @Post('increment-item')
-  incrementCartItem(@Body() changeQuantityDTO: ChangeQuantityDTO) {
-    return this.cartService.incrementCartItemQuantity(changeQuantityDTO);
+  incrementCartItem(
+    @Body('productId') productId: string,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.cartService.incrementCartItemQuantity(req.user.id, productId);
   }
 
   @Post('decrement-item')
-  decrementCartItem(@Body() changeQuantityDTO: ChangeQuantityDTO) {
-    return this.cartService.decrementCartItemQuantity(changeQuantityDTO);
+  decrementCartItem(
+    @Body('productId') productId: string,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.cartService.decrementCartItemQuantity(req.user.id, productId);
   }
 
-  @Delete(':id')
-  clearCart(@Param('id') id: string) {
-    return this.cartService.clearCart(id);
+  @Delete()
+  clearCart(@Req() req: RequestWithUser) {
+    return this.cartService.clearCart(req.user.id);
   }
 }

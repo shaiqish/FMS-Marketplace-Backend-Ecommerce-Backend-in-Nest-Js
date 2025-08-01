@@ -3,9 +3,6 @@ import { IsInt, Min, IsUUID } from 'class-validator';
 
 export class AddItemDTO {
   @IsUUID()
-  userId: string;
-
-  @IsUUID()
   productId: string;
 
   @Type(() => Number)

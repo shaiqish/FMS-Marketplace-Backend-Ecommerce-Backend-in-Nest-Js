@@ -40,7 +40,4 @@ export class CreateOrderDto {
 
   @IsString()
   postalCode: string;
-
-  @IsString()
-  userId: string;
 }

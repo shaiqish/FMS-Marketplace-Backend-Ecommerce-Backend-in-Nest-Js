@@ -12,9 +12,8 @@ import {
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '../../common/guards/auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
 import { Response } from 'express';
+import RequestWithUser from 'src/common/interfaces/RequestWithUser.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -32,15 +31,8 @@ export class AuthController {
 
   @Get('user')
   @UseGuards(AuthGuard)
-  getUser(@Request() req) {
+  getUser(@Request() req: RequestWithUser) {
     return req.user;
-  }
-
-  @Get('admin')
-  @Roles('moderator')
-  @UseGuards(RolesGuard)
-  getAdmin() {
-    return 'This is admin';
   }
 
   //OAuth from here

@@ -12,11 +12,12 @@ import { ShippingAddress } from '../user/entities/shipping-address.entity';
 import { User } from '../user/entities/user.entity';
 import { Cart } from '../cart/entities/cart.entity';
 import { OrderItem } from './entities/order-item.entity';
+import { UpdateStatusDTO } from './dto/update-status.dto';
 
 @Injectable()
 export class OrderService {
   constructor(private dataSource: DataSource) {}
-  async create(createOrderDto: CreateOrderDto) {
+  async create(createOrderDto: CreateOrderDto, userId: string) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -24,7 +25,7 @@ export class OrderService {
     try {
       // 1. Get the full user entity
       const user = await queryRunner.manager.findOne(User, {
-        where: { id: createOrderDto.userId },
+        where: { id: userId },
       });
       if (!user) {
         throw new NotFoundException('User not found');
@@ -39,7 +40,7 @@ export class OrderService {
 
       // 3. Load user's cart
       const cart = await queryRunner.manager.findOne(Cart, {
-        where: { user: { id: createOrderDto.userId } },
+        where: { user: { id: userId } },
         relations: ['items', 'items.product'],
       });
 
@@ -154,21 +155,22 @@ export class OrderService {
     return order;
   }
 
-  async update(id: string, updateOrderDto: UpdateOrderDto) {
+  async updateStatus(updateStatusDto: UpdateStatusDTO) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
       const order = await queryRunner.manager.findOne(Order, {
-        where: { id },
-        relations: ['user', 'items', 'items.product', 'shippingAddress'],
+        where: { id: updateStatusDto.orderId },
       });
       if (!order) {
-        throw new NotFoundException(`Order with id ${id} not found`);
+        throw new NotFoundException(
+          `Order with id ${updateStatusDto.orderId} not found`,
+        );
       }
 
-      Object.assign(order, updateOrderDto);
+      order.status = updateStatusDto.status;
       await queryRunner.manager.save(order);
       await queryRunner.commitTransaction();
 
@@ -181,7 +183,7 @@ export class OrderService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       throw new InternalServerErrorException(
-        `Failed to update order: ${errorMessage}`,
+        `Failed to update order status: ${errorMessage}`,
       );
     } finally {
       await queryRunner.release();
